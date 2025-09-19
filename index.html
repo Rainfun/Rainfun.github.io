@@ -1,123 +1,31 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Portfolio of Rainfun">
-    <title>Rainfun's Portfolio</title>
-    <link rel="stylesheet" href="style.css">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: black;
-            color: white;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .profile-container {
-            text-align: center;
-            background-color: #333;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            position: relative;
-        }
-
-        .profile-circle {
-            width: 150px;
-            height: 150px;
-            background-color: #4CAF50;
-            border-radius: 50%;
-            margin: 0 auto;
-            background-image: url('https://raw.githubusercontent.com/Rainfun/Rainfun.github.io/refs/heads/main/Profilepicutre.png');
-            background-size: cover;
-            background-position: center;
-        }
-
-        h1 {
-            font-size: 2em;
-            margin-top: 10px;
-        }
-
-        p {
-            font-size: 1.1em;
-            color: #ddd;
-        }
-
-        .highlight {
-            color: #4CAF50;
-            font-weight: bold;
-        }
-
-        /* Mouse hover circle */
-        .mouse-circle {
-            position: absolute;
-            width: 40px;
-            height: 40px;
-            background-color: rgba(0, 0, 255, 0.5);
-            border-radius: 50%;
-            pointer-events: none;
-            transform: translate(-50%, -50%);
-            transition: all 0.1s ease;
-        }
-
-        /* Rain effect */
-        .rain {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: url('https://www.transparenttextures.com/patterns/asfalt-dark.png');
-            background-size: cover;
-            opacity: 0;
-            pointer-events: none;
-            z-index: -1;
-            animation: rain-animation 3s infinite;
-        }
-
-        @keyframes rain-animation {
-            0% { opacity: 0; }
-            50% { opacity: 0.7; }
-            100% { opacity: 0; }
-        }
-    </style>
+  <meta charset="utf-8">
+  <title>slppy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #111;
+    }
+    iframe {
+      width: 80%;
+      height: 80%;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    }
+  </style>
 </head>
 <body>
-    <div class="profile-container">
-        <div class="profile-circle"></div>
-        <h1>Rainfun</h1>
-        <p>Hello! I'm <span class="highlight">Rainfun</span>, a passionate developer with a love for creating innovative and interactive experiences.</p>
-        <p>Currently, I'm learning <span class="highlight">Roblox scripting</span>, especially UI design and animation events. I'm also exploring web development, focusing on HTML, CSS, and JavaScript.</p>
-        <p>I enjoy solving problems, building things from scratch, and continually improving my coding skills!</p>
-    </div>
-
-    <div class="rain"></div>
-    <div class="mouse-circle" id="mouse-circle"></div>
-
-    <script>
-        // Mouse hover circle effect
-        const mouseCircle = document.getElementById('mouse-circle');
-        document.addEventListener('mousemove', (e) => {
-            mouseCircle.style.left = `${e.pageX}px`;
-            mouseCircle.style.top = `${e.pageY}px`;
-        });
-
-        // Rain effect on click
-        document.addEventListener('click', () => {
-            const rainEffect = document.querySelector('.rain');
-            rainEffect.style.opacity = 1;
-            setTimeout(() => {
-                rainEffect.style.opacity = 0;
-            }, 3000);
-        });
-    </script>
+  <iframe 
+    src="https://cdn.discordapp.com/attachments/1406391873911782615/1416852880341733548/Sleepyx3-2025-09-14T18_26_15.206Z.mp4?ex=68cda092&is=68cc4f12&hm=47ad1b82cf1e57452c423f527bed86c88df8bf2a358345d1cc9bcd7608c667f0&" 
+    allowfullscreen>
+  </iframe>
 </body>
 </html>
