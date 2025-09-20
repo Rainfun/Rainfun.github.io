@@ -44,9 +44,38 @@ body {
 .nickname-area button { padding:5px 10px; border-radius:5px; border:none; background:#007bff; color:#fff; cursor:pointer; }
 .nickname-area button:hover { background:#0056b3; }
 .replying { font-size:0.7rem; color:#ccc; margin-bottom:2px; }
+
+/* Countdown panel */
+#countdownPanel {
+  position: fixed;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 220px;
+  height: 130px;
+  background: #111;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.7);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+  text-align: center;
+  font-family: Arial, sans-serif;
+  font-size: 1.5rem;
+}
+#timerText { margin-top:10px; font-size:2rem; }
 </style>
 </head>
 <body>
+
+<!-- Global countdown panel -->
+<div id="countdownPanel">
+  <div>⏳ Unlock Video In</div>
+  <div id="timerText">00:00:00</div>
+</div>
+<audio id="tickSound" src="https://actions.google.com/sounds/v1/clock/analog_watch_tick.ogg" loop></audio>
 
 <div class="chat-container">
 
@@ -73,14 +102,13 @@ body {
 
   <button id="voiceBtn" style="margin:5px; padding:8px; border:none; border-radius:5px; background:#007bff; color:#fff; cursor:pointer;">Voice Chat</button>
 
-  <!-- Hidden audio element to play remote voice -->
   <audio id="remoteAudio" autoplay></audio>
 
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, orderBy, doc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, orderBy, doc, updateDoc, arrayUnion, getDoc, setDoc, Timestamp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAUSdIAjFmgHJyDs7DPm_wqDfH5gTtgowI",
@@ -94,7 +122,43 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Username & nickname
+// ---------- GLOBAL COUNTDOWN TIMER ----------
+const TIMER_DOC = doc(db,"globalTimers","leftCountdown");
+const TIMER_DURATION_MS = 2*60*60*1000 + 3*60*1000 + 50*1000; // 2h 3m 50s
+const timerText = document.getElementById("timerText");
+const tickSound = document.getElementById("tickSound");
+
+async function initTimer() {
+  const docSnap = await getDoc(TIMER_DOC);
+  let endTime;
+  if(docSnap.exists()){
+    endTime = docSnap.data().endTime.toMillis();
+  } else {
+    endTime = Date.now() + TIMER_DURATION_MS;
+    await setDoc(TIMER_DOC,{endTime: Timestamp.fromMillis(endTime)});
+  }
+
+  tickSound.play();
+
+  const interval = setInterval(()=>{
+    const now = Date.now();
+    let remaining = endTime - now;
+    if(remaining <= 0){
+      clearInterval(interval);
+      timerText.textContent = "00:00:00";
+      tickSound.pause();
+      return;
+    }
+    const hrs = Math.floor(remaining / (1000*60*60));
+    const mins = Math.floor((remaining % (1000*60*60)) / (1000*60));
+    const secs = Math.floor((remaining % (1000*60)) / 1000);
+    timerText.textContent = `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+  },1000);
+}
+initTimer();
+
+// ---------- CHAT CODE ----------
+
 let username = localStorage.getItem("username") || "";
 let nickname = localStorage.getItem("nickname") || "";
 document.getElementById("usernameInput").value=username;
@@ -112,14 +176,12 @@ const replyingDiv=document.getElementById("replying");
 
 const q=query(collection(db,"messages"),orderBy("timestamp","asc"));
 
-// Render messages
 onSnapshot(q,(snapshot)=>{
   messagesDiv.innerHTML="";
   snapshot.forEach(docSnap=>{
     const msg = docSnap.data();
     const div=document.createElement("div");
     div.classList.add("message");
-
     const replyText=msg.replyToUser ? `<div class="replying">Replying to ${msg.replyToUser}</div>` : "";
     const time=msg.timestamp?.toDate().toLocaleString() || "Just now";
     const displayName=msg.nickname||msg.user;
@@ -155,7 +217,6 @@ onSnapshot(q,(snapshot)=>{
   messagesDiv.scrollTop=messagesDiv.scrollHeight;
 });
 
-// Send message
 sendBtn.onclick=async ()=>{
   const now=Date.now();
   const lastSent=parseInt(localStorage.getItem(lastSentKey))||0;
@@ -173,12 +234,10 @@ sendBtn.onclick=async ()=>{
 }
 msgInput.addEventListener("keypress",e=>{ if(e.key==="Enter") sendBtn.click(); });
 
-// Emoji picker
 emojiPicker.querySelectorAll("span").forEach(e=>{
   e.addEventListener("click",()=>{ msgInput.value+=e.textContent; msgInput.focus(); });
 });
 
-// Username/nickname
 document.getElementById("setUsernameBtn").onclick=()=>{
   const val=document.getElementById("usernameInput").value.trim();
   if(!val){ alert("Enter username"); return; }
@@ -194,38 +253,29 @@ document.getElementById("setNicknameBtn").onclick=()=>{
   localStorage.setItem("nickname",nickname);
 };
 
-// ---------- VOICE CHAT USING WEBRTC ----------
+// ---------- VOICE CHAT ----------
 const voiceBtn=document.getElementById("voiceBtn");
 const remoteAudio=document.getElementById("remoteAudio");
-
 let pc;
 let localStream;
 const roomId="voice-room";
 
 voiceBtn.onclick=async ()=>{
-  // 1. Get microphone
   localStream=await navigator.mediaDevices.getUserMedia({ audio:true });
   pc=new RTCPeerConnection();
-
-  // 2. Add local track
   localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
-
-  // 3. Remote audio
   pc.ontrack=(event)=>{ remoteAudio.srcObject=event.streams[0]; };
-
   const roomRef=doc(db,"voiceRooms",roomId);
   const offerCol=collection(roomRef,"offers");
   const answerCol=collection(roomRef,"answers");
   const candidatesCol=collection(roomRef,"candidates");
 
-  // 4. ICE candidates
   pc.onicecandidate=async(event)=>{
     if(event.candidate){
       await addDoc(candidatesCol,{candidate:event.candidate.toJSON(), user:username});
     }
   };
 
-  // 5. Listen remote ICE
   onSnapshot(candidatesCol,snapshot=>{
     snapshot.docChanges().forEach(async change=>{
       if(change.type==="added" && change.doc.data().user!==username){
@@ -234,12 +284,10 @@ voiceBtn.onclick=async ()=>{
     });
   });
 
-  // 6. Create offer
   const offer=await pc.createOffer();
   await pc.setLocalDescription(offer);
   await addDoc(offerCol,{sdp:offer.sdp,type:offer.type,user:username});
 
-  // 7. Listen for answer
   onSnapshot(answerCol,snapshot=>{
     snapshot.docChanges().forEach(async change=>{
       if(change.type==="added"){
