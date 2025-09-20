@@ -73,6 +73,9 @@ body {
 
   <button id="voiceBtn" style="margin:5px; padding:8px; border:none; border-radius:5px; background:#007bff; color:#fff; cursor:pointer;">Voice Chat</button>
 
+  <!-- Hidden audio element to play remote voice -->
+  <audio id="remoteAudio" autoplay></audio>
+
 </div>
 
 <script type="module">
@@ -91,13 +94,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// Username & nickname
 let username = localStorage.getItem("username") || "";
 let nickname = localStorage.getItem("nickname") || "";
 document.getElementById("usernameInput").value=username;
 document.getElementById("nicknameInput").value=nickname;
 
 let replyToId=null;
-const cooldown = 3000;
+const cooldown=3000;
 const lastSentKey="lastSentTime";
 
 const messagesDiv=document.getElementById("messages");
@@ -190,9 +194,62 @@ document.getElementById("setNicknameBtn").onclick=()=>{
   localStorage.setItem("nickname",nickname);
 };
 
-// Voice chat placeholder
-document.getElementById("voiceBtn").onclick=()=>{
-  alert("Voice chat requires a WebRTC signaling server. Placeholder only.");
+// ---------- VOICE CHAT USING WEBRTC ----------
+const voiceBtn=document.getElementById("voiceBtn");
+const remoteAudio=document.getElementById("remoteAudio");
+
+let pc;
+let localStream;
+const roomId="voice-room";
+
+voiceBtn.onclick=async ()=>{
+  // 1. Get microphone
+  localStream=await navigator.mediaDevices.getUserMedia({ audio:true });
+  pc=new RTCPeerConnection();
+
+  // 2. Add local track
+  localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
+
+  // 3. Remote audio
+  pc.ontrack=(event)=>{ remoteAudio.srcObject=event.streams[0]; };
+
+  const roomRef=doc(db,"voiceRooms",roomId);
+  const offerCol=collection(roomRef,"offers");
+  const answerCol=collection(roomRef,"answers");
+  const candidatesCol=collection(roomRef,"candidates");
+
+  // 4. ICE candidates
+  pc.onicecandidate=async(event)=>{
+    if(event.candidate){
+      await addDoc(candidatesCol,{candidate:event.candidate.toJSON(), user:username});
+    }
+  };
+
+  // 5. Listen remote ICE
+  onSnapshot(candidatesCol,snapshot=>{
+    snapshot.docChanges().forEach(async change=>{
+      if(change.type==="added" && change.doc.data().user!==username){
+        try{ await pc.addIceCandidate(change.doc.data().candidate); }catch(e){console.error(e);}
+      }
+    });
+  });
+
+  // 6. Create offer
+  const offer=await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await addDoc(offerCol,{sdp:offer.sdp,type:offer.type,user:username});
+
+  // 7. Listen for answer
+  onSnapshot(answerCol,snapshot=>{
+    snapshot.docChanges().forEach(async change=>{
+      if(change.type==="added"){
+        const ans=change.doc.data();
+        await pc.setRemoteDescription({type:ans.type,sdp:ans.sdp});
+      }
+    });
+  });
+
+  alert("Voice chat ready! Others in the same room can hear you.");
 };
 </script>
 </body>
