@@ -16,11 +16,6 @@ body {
   padding-right: 20px;
   overflow: hidden;
 }
-  <div id="timerPanel" style="position:absolute; left:20px; top:50%; transform:translateY(-50%); width:220px; height:120px; background:#1e1e1e; border-radius:10px; display:flex; flex-direction:column; justify-content:center; align-items:center; box-shadow:0 4px 10px rgba(0,0,0,0.5); padding:10px;">
-  <div style="font-size:0.9rem; color:#aaa; margin-bottom:5px;">Unlocking in:</div>
-  <div id="timerText" style="font-size:2rem; font-weight:bold;">00:00:00:00</div>
-  <audio id="tickSound" src="https://www.soundjay.com/clock/sounds/clock-ticking-1.mp3" loop></audio>
-</div>
 .chat-container {
   width: 500px;
   height: 80vh;
@@ -78,16 +73,16 @@ body {
 <!-- Global countdown panel -->
 <div id="countdownPanel">
   <div>⏳ Unlock Video In</div>
-  <div id="timerText">00:00:00</div>
+  <div id="timerText">00:00:00:00</div>
 </div>
 <audio id="tickSound" src="https://actions.google.com/sounds/v1/clock/analog_watch_tick.ogg" loop></audio>
 
 <div class="chat-container">
 
   <div class="nickname-area">
-    <input id="usernameInput" placeholder="Set your username (one-time)" />
+    <input id="usernameInput" placeholder="Set your username (one-time)" maxlength="20"/>
     <button id="setUsernameBtn">Set</button>
-    <input id="nicknameInput" placeholder="Change nickname anytime" />
+    <input id="nicknameInput" placeholder="Change nickname anytime" maxlength="20"/>
     <button id="setNicknameBtn">Set</button>
   </div>
 
@@ -101,7 +96,7 @@ body {
   </div>
 
   <div class="input-area">
-    <input id="msgInput" type="text" placeholder="Type a message...">
+    <input id="msgInput" type="text" placeholder="Type a message..." maxlength="3000">
     <button id="sendBtn">Send</button>
   </div>
 
@@ -113,7 +108,7 @@ body {
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, orderBy, doc, updateDoc, arrayUnion, getDoc, setDoc, Timestamp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, orderBy, doc, updateDoc, arrayUnion, getDoc, setDoc, Timestamp, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAUSdIAjFmgHJyDs7DPm_wqDfH5gTtgowI",
@@ -129,7 +124,7 @@ const db = getFirestore(app);
 
 // ---------- GLOBAL COUNTDOWN TIMER ----------
 const TIMER_DOC = doc(db,"globalTimers","leftCountdown");
-const TIMER_DURATION_MS = 2 * 24 * 60 * 60 * 1000; // 2 days
+const TIMER_DURATION_MS = (2*24*60*60 + 6*60*60 + 50*60 + 20) * 1000; // 2d 6h 50m 20s
 const timerText = document.getElementById("timerText");
 const tickSound = document.getElementById("tickSound");
 
@@ -143,7 +138,7 @@ async function initTimer() {
     await setDoc(TIMER_DOC,{endTime: Timestamp.fromMillis(endTime)});
   }
 
-  tickSound.play().catch(()=>{}); // autoplay might be blocked until user interacts
+  tickSound.play();
 
   const interval = setInterval(()=>{
     const now = Date.now();
@@ -158,14 +153,25 @@ async function initTimer() {
     const hrs = Math.floor((remaining % (1000*60*60*24)) / (1000*60*60));
     const mins = Math.floor((remaining % (1000*60*60)) / (1000*60));
     const secs = Math.floor((remaining % (1000*60)) / 1000);
-    timerText.textContent = `${String(days).padStart(2,'0')}:${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+    timerText.textContent =
+      `${String(days).padStart(2,'0')}:${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
   },1000);
 }
-
 initTimer();
 
-// ---------- CHAT CODE ----------
+// ---------- RESET CHAT ONCE ----------
+const RESET_FLAG = doc(db,"globalFlags","chatReset");
+async function resetChatOnce() {
+  const flagSnap = await getDoc(RESET_FLAG);
+  if(!flagSnap.exists()){
+    const msgs = await getDocs(collection(db,"messages"));
+    msgs.forEach(async m=>await deleteDoc(doc(db,"messages",m.id)));
+    await setDoc(RESET_FLAG,{done:true});
+  }
+}
+resetChatOnce();
 
+// ---------- CHAT CODE ----------
 let username = localStorage.getItem("username") || "";
 let nickname = localStorage.getItem("nickname") || "";
 document.getElementById("usernameInput").value=username;
@@ -230,9 +236,10 @@ sendBtn.onclick=async ()=>{
   if(now-lastSent<cooldown){ alert("Wait a few seconds."); return; }
   if(!username){ alert("Set your username first."); return; }
   if(msgInput.value.trim()==="") return;
+  if(msgInput.value.length>3000){ alert("Message too long! Max 3000 characters."); return; }
   const data={ user:username, nickname:nickname||username, text:msgInput.value, timestamp:serverTimestamp(), reactions:{} };
   if(replyToId) data.replyTo=replyToId;
-  if(replyToId) data.replyToUser=""; // optional
+  if(replyToId) data.replyToUser="";
   await addDoc(collection(db,"messages"),data);
   msgInput.value="";
   localStorage.setItem(lastSentKey,now);
@@ -248,6 +255,7 @@ emojiPicker.querySelectorAll("span").forEach(e=>{
 document.getElementById("setUsernameBtn").onclick=()=>{
   const val=document.getElementById("usernameInput").value.trim();
   if(!val){ alert("Enter username"); return; }
+  if(val.length>20){ alert("Username max 20 characters."); return; }
   if(localStorage.getItem("username")){ alert("Username already set"); return; }
   username=val;
   localStorage.setItem("username",username);
@@ -256,6 +264,7 @@ document.getElementById("setUsernameBtn").onclick=()=>{
 document.getElementById("setNicknameBtn").onclick=()=>{
   const val=document.getElementById("nicknameInput").value.trim();
   if(!val) return;
+  if(val.length>20){ alert("Nickname max 20 characters."); return; }
   nickname=val;
   localStorage.setItem("nickname",nickname);
 };
