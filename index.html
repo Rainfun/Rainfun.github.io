@@ -124,7 +124,7 @@ const db = getFirestore(app);
 
 // ---------- GLOBAL COUNTDOWN TIMER ----------
 const TIMER_DOC = doc(db,"globalTimers","leftCountdown");
-const TIMER_DURATION_MS = 2*60*60*1000 + 3*60*1000 + 50*1000; // 2h 3m 50s
+const TIMER_DURATION_MS = 2 * 24 * 60 * 60 * 1000; // 2 days
 const timerText = document.getElementById("timerText");
 const tickSound = document.getElementById("tickSound");
 
@@ -138,23 +138,25 @@ async function initTimer() {
     await setDoc(TIMER_DOC,{endTime: Timestamp.fromMillis(endTime)});
   }
 
-  tickSound.play();
+  tickSound.play().catch(()=>{}); // autoplay might be blocked until user interacts
 
   const interval = setInterval(()=>{
     const now = Date.now();
     let remaining = endTime - now;
     if(remaining <= 0){
       clearInterval(interval);
-      timerText.textContent = "00:00:00";
+      timerText.textContent = "00:00:00:00";
       tickSound.pause();
       return;
     }
-    const hrs = Math.floor(remaining / (1000*60*60));
+    const days = Math.floor(remaining / (1000*60*60*24));
+    const hrs = Math.floor((remaining % (1000*60*60*24)) / (1000*60*60));
     const mins = Math.floor((remaining % (1000*60*60)) / (1000*60));
     const secs = Math.floor((remaining % (1000*60)) / 1000);
-    timerText.textContent = `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+    timerText.textContent = `${String(days).padStart(2,'0')}:${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
   },1000);
 }
+
 initTimer();
 
 // ---------- CHAT CODE ----------
