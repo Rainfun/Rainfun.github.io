@@ -1,24 +1,251 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>gggg</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8">
+  <title>Anon Chat with Emojis & Reactions</title>
   <style>
     body {
+      font-family: Arial, sans-serif;
       margin: 0;
+      height: 100vh;
+      background: #121212;
+      color: #fff;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding-right: 20px;
+      overflow: hidden;
+    }
+
+    .overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(18,18,18,0.8);
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      background: #111;
+      font-size: 2rem;
+      font-weight: bold;
       color: #fff;
-      font-family: Arial, sans-serif;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .chat-container {
+      width: 400px;
+      height: 700px;
+      border-radius: 10px;
+      background: #1e1e1e;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      z-index: 1;
+    }
+
+    .messages {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+    }
+
+    .message {
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      max-width: 80%;
+      background: #333;
+      color: #fff;
+      font-size: 0.9rem;
+      word-wrap: break-word;
+      position: relative;
+    }
+
+    .message b {
+      color: #fff;
+    }
+
+    .message small {
+      display: block;
+      font-size: 0.7rem;
+      color: #fff;
+      margin-top: 2px;
+    }
+
+    .reactions {
+      margin-top: 4px;
+      display: flex;
+      gap: 5px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    .emoji-picker {
+      display: flex;
+      flex-wrap: wrap;
+      padding: 5px;
+      background: #2c2c2c;
+      border-top: 1px solid #444;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+
+    .emoji-picker span {
       font-size: 1.5rem;
+      margin: 5px;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    .emoji-picker span:hover {
+      transform: scale(1.3);
+    }
+
+    .input-area {
+      display: flex;
+      border-top: 1px solid #444;
+    }
+
+    .input-area input {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 0 0 0 10px;
+      outline: none;
+      background: #2c2c2c;
+      color: #fff;
+    }
+
+    .input-area button {
+      padding: 10px 15px;
+      border: none;
+      background: #007bff;
+      color: white;
+      border-radius: 0 0 10px 0;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .input-area button:hover {
+      background: #0056b3;
     }
   </style>
 </head>
 <body>
-  if u come from my bio this wasnt mean for u go back to wtv u were doing.
+  <div class="overlay">Work in progress, come back later |</div>
+
+  <div class="chat-container">
+    <div class="messages" id="messages"></div>
+
+    <div class="emoji-picker" id="emojiPicker">
+      <span>😀</span><span>😂</span><span>😍</span><span>😎</span>
+      <span>😢</span><span>😡</span><span>👍</span><span>❤️</span>
+      <span>🎉</span><span>💀</span><span>🔥</span>
+    </div>
+
+    <div class="input-area">
+      <input id="msgInput" type="text" placeholder="Type a message...">
+      <button id="sendBtn">Send</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, onSnapshot, serverTimestamp,
+      query, orderBy, doc, updateDoc, arrayUnion
+    } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAUSdIAjFmgHJyDs7DPm_wqDfH5gTtgowI",
+      authDomain: "anon-chat-7aeb8.firebaseapp.com",
+      projectId: "anon-chat-7aeb8",
+      storageBucket: "anon-chat-7aeb8.firebasestorage.app",
+      messagingSenderId: "893900185108",
+      appId: "1:893900185108:web:2c1d3e69adb019f5fa5101",
+      measurementId: "G-QWS96HKVH8"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const messagesDiv = document.getElementById("messages");
+    const msgInput = document.getElementById("msgInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const emojiPicker = document.getElementById("emojiPicker");
+
+    const username = "Anon-" + Math.floor(Math.random() * 1000);
+    const cooldown = 5000;
+    const lastSentKey = "lastSentTime";
+
+    const q = query(collection(db, "messages"), orderBy("timestamp", "asc"));
+
+    onSnapshot(q, (snapshot) => {
+      messagesDiv.innerHTML = "";
+      snapshot.forEach((docSnap) => {
+        const msg = docSnap.data();
+        const div = document.createElement("div");
+        div.classList.add("message");
+
+        const time = msg.timestamp?.toDate().toLocaleString() || "Just now";
+        div.innerHTML = `<b>${msg.user}:</b> ${msg.text} <small>${time}</small>`;
+
+        // Add reactions container
+        const reactionsDiv = document.createElement("div");
+        reactionsDiv.classList.add("reactions");
+
+        const emojis = ["😀","😂","😍","😎","😢","😡","👍","❤️","🎉","💀","🔥"];
+        emojis.forEach(e => {
+          const span = document.createElement("span");
+          span.textContent = e + (msg.reactions?.[e]?.length || "");
+          span.addEventListener("click", async () => {
+            const msgRef = doc(db, "messages", docSnap.id);
+            await updateDoc(msgRef, {
+              [`reactions.${e}`]: arrayUnion(username)
+            });
+          });
+          reactionsDiv.appendChild(span);
+        });
+
+        div.appendChild(reactionsDiv);
+        messagesDiv.appendChild(div);
+      });
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
+
+    sendBtn.addEventListener("click", async () => {
+      const now = Date.now();
+      const lastSent = parseInt(localStorage.getItem(lastSentKey)) || 0;
+
+      if (now - lastSent < cooldown) {
+        alert("Please wait a few seconds before sending another message.");
+        return;
+      }
+
+      if (msgInput.value.trim() !== "") {
+        await addDoc(collection(db, "messages"), {
+          user: username,
+          text: msgInput.value,
+          timestamp: serverTimestamp(),
+          reactions: {}
+        });
+        msgInput.value = "";
+        localStorage.setItem(lastSentKey, now);
+      }
+    });
+
+    msgInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") sendBtn.click();
+    });
+
+    emojiPicker.querySelectorAll("span").forEach(emoji => {
+      emoji.addEventListener("click", () => {
+        msgInput.value += emoji.textContent;
+        msgInput.focus();
+      });
+    });
+  </script>
 </body>
 </html>
