@@ -16,6 +16,11 @@ body {
   padding-right: 20px;
   overflow: hidden;
 }
+  <div id="timerPanel" style="position:absolute; left:20px; top:50%; transform:translateY(-50%); width:220px; height:120px; background:#1e1e1e; border-radius:10px; display:flex; flex-direction:column; justify-content:center; align-items:center; box-shadow:0 4px 10px rgba(0,0,0,0.5); padding:10px;">
+  <div style="font-size:0.9rem; color:#aaa; margin-bottom:5px;">Unlocking in:</div>
+  <div id="timerText" style="font-size:2rem; font-weight:bold;">00:00:00:00</div>
+  <audio id="tickSound" src="https://www.soundjay.com/clock/sounds/clock-ticking-1.mp3" loop></audio>
+</div>
 .chat-container {
   width: 500px;
   height: 80vh;
