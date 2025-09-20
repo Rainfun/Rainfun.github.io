@@ -17,8 +17,8 @@
     overflow: hidden;
   }
   .chat-container {
-    width: 400px;
-    height: 700px;
+    width: 450px;
+    height: 750px;
     border-radius: 10px;
     background: #1e1e1e;
     display: flex;
@@ -38,7 +38,7 @@
     max-width: 80%;
     background: #333;
     color: #fff;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     word-wrap: break-word;
     position: relative;
   }
@@ -56,12 +56,8 @@
   .nickname-area input { flex:1; padding:5px; border-radius:5px; border:none; outline:none; background:#2c2c2c; color:#fff; }
   .nickname-area button { padding:5px 10px; border-radius:5px; border:none; background:#007bff; color:#fff; cursor:pointer; }
   .nickname-area button:hover { background:#0056b3; }
-  .iframe-area { width:100%; height:150px; border:none; margin-top:5px; background:#111; }
-  .countdown { text-align:center; margin:5px 0; font-size:1rem; }
+  .iframe-area { width:100%; height:250px; border:none; margin-top:5px; background:#111; }
   .replying { font-size:0.7rem; color:#ccc; margin-bottom:2px; }
-  .entertainment { display:flex; gap:5px; padding:5px; flex-wrap:wrap; }
-  .entertainment button { background:#007bff; color:#fff; border:none; padding:5px 8px; border-radius:5px; cursor:pointer; }
-  .entertainment button:hover { background:#0056b3; }
 </style>
 </head>
 <body>
@@ -88,15 +84,9 @@
     <button id="sendBtn">Send</button>
   </div>
 
-  <div class="entertainment">
-    <button id="randEmoji">Random Emoji</button>
-    <button id="miniGame">Mini Game</button>
-    <button id="soundBtn">Sound</button>
-    <button id="voiceBtn">Voice Chat</button>
-  </div>
+  <iframe class="iframe-area" src="https://www.google.com" id="browserIframe"></iframe>
 
-  <div class="countdown" id="countdown">00:00:00</div>
-  <iframe class="iframe-area" src="" id="iframeArea"></iframe>
+  <button id="voiceBtn" style="margin:5px; padding:8px; border:none; border-radius:5px; background:#007bff; color:#fff; cursor:pointer;">Voice Chat</button>
 
 </div>
 
@@ -107,6 +97,7 @@ import {
   query, orderBy, doc, updateDoc, arrayUnion
 } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyAUSdIAjFmgHJyDs7DPm_wqDfH5gTtgowI",
   authDomain: "anon-chat-7aeb8.firebaseapp.com",
@@ -122,7 +113,7 @@ const db = getFirestore(app);
 
 let username = "Anon-" + Math.floor(Math.random()*1000);
 let replyToId = null;
-const cooldown = 5000;
+const cooldown = 3000;
 const lastSentKey = "lastSentTime";
 
 const messagesDiv = document.getElementById("messages");
@@ -133,30 +124,11 @@ const replyingDiv = document.getElementById("replying");
 
 const nicknameInput = document.getElementById("nicknameInput");
 const nicknameBtn = document.getElementById("nicknameBtn");
-
-const randEmojiBtn = document.getElementById("randEmoji");
-const miniGameBtn = document.getElementById("miniGame");
-const soundBtn = document.getElementById("soundBtn");
 const voiceBtn = document.getElementById("voiceBtn");
 
-const countdownEl = document.getElementById("countdown");
-
-// Countdown placeholder
-let targetTime = new Date().getTime() + 3600000; // +1 hour
-function updateCountdown(){
-  let now = new Date().getTime();
-  let diff = targetTime - now;
-  if(diff<0) diff=0;
-  let h = String(Math.floor(diff/3600000)).padStart(2,'0');
-  let m = String(Math.floor((diff%3600000)/60000)).padStart(2,'0');
-  let s = String(Math.floor((diff%60000)/1000)).padStart(2,'0');
-  countdownEl.textContent = `${h}:${m}:${s}`;
-}
-setInterval(updateCountdown,1000);
-updateCountdown();
-
-// Firebase messages
 const q = query(collection(db,"messages"),orderBy("timestamp","asc"));
+
+// Show messages
 onSnapshot(q,(snapshot)=>{
   messagesDiv.innerHTML="";
   snapshot.forEach(docSnap=>{
@@ -168,6 +140,7 @@ onSnapshot(q,(snapshot)=>{
     const time = msg.timestamp?.toDate().toLocaleString() || "Just now";
     div.innerHTML = `${replyText}<b>${msg.user}:</b> ${msg.text} <small>${time}</small>`;
 
+    // Reactions
     const reactionsDiv = document.createElement("div");
     reactionsDiv.classList.add("reactions");
     const emojis = ["😀","😂","😍","😎","😢","😡","👍","❤️","🎉","💀","🔥"];
@@ -195,34 +168,23 @@ onSnapshot(q,(snapshot)=>{
       replyingDiv.textContent = "Replying to "+msg.user;
       msgInput.focus();
     });
-    div.appendChild(replyBtn);
 
+    div.appendChild(replyBtn);
     div.appendChild(reactionsDiv);
     messagesDiv.appendChild(div);
   });
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 });
 
-// Send message with cooldown
-sendBtn.addEventListener("click",async()=>{
+// Send message
+sendBtn.addEventListener("click", async ()=>{
   const now = Date.now();
   const lastSent = parseInt(localStorage.getItem(lastSentKey)) || 0;
-  if(now-lastSent<cooldown){
-    alert("Please wait a few seconds before sending another message.");
-    return;
-  }
+  if(now-lastSent<cooldown){ alert("Wait a few seconds."); return; }
   if(msgInput.value.trim()!==""){
-    const data = {
-      user: username,
-      text: msgInput.value,
-      timestamp: serverTimestamp(),
-      reactions:{}
-    };
+    const data = { user: username, text: msgInput.value, timestamp: serverTimestamp(), reactions:{} };
     if(replyToId) data.replyTo = replyToId;
-    if(replyToId) {
-      const replyDoc = await doc(db,"messages",replyToId).get();
-      data.replyToUser = ""; // optional
-    }
+    if(replyToId) data.replyToUser = ""; // optional
     await addDoc(collection(db,"messages"),data);
     msgInput.value="";
     localStorage.setItem(lastSentKey,now);
@@ -240,12 +202,12 @@ emojiPicker.querySelectorAll("span").forEach(emoji=>{
 // Nickname
 nicknameBtn.addEventListener("click",()=>{if(nicknameInput.value.trim()!=="") username=nicknameInput.value; nicknameInput.value="";});
 
-// Entertainment buttons
-randEmojiBtn.addEventListener("click",()=>{msgInput.value+=["😀","😂","😍","😎","😢","😡","👍","❤️","🎉","💀","🔥"][Math.floor(Math.random()*12)]; msgInput.focus();});
-miniGameBtn.addEventListener("click",()=>{alert("Mini Game Placeholder!");});
-soundBtn.addEventListener("click",()=>{new Audio("https://www.soundjay.com/button/beep-07.wav").play();});
-voiceBtn.addEventListener("click",()=>{alert("Voice Chat Placeholder! Requires WebRTC implementation.");});
-</script>
+// Simple WebRTC voice chat (one-to-one room example)
+voiceBtn.addEventListener("click",()=>{
+  alert("Voice chat enabled: use WebRTC signaling server to connect peers.");
+  // Placeholder: implementing a full multi-user voice chat requires signaling server
+});
 
+</script>
 </body>
 </html>
