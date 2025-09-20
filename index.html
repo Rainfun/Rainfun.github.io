@@ -6,53 +6,59 @@
 <style>
 body {
   font-family: Arial, sans-serif;
-  margin:0; padding:0;
-  height:100vh; background:#121212; color:#fff;
-  display:flex; justify-content:flex-end; align-items:center;
-  overflow:hidden;
+  margin: 0;
+  height: 100vh;
+  background: #121212;
+  color: #fff;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding-right: 20px;
+  overflow: hidden;
 }
 .chat-container {
-  width: 450px; height: 80vh;
-  background:#1e1e1e; border-radius:10px;
-  display:flex; flex-direction:column; overflow:hidden;
-  box-shadow:0 4px 10px rgba(0,0,0,0.5);
+  width: 500px;
+  height: 80vh;
+  border-radius: 10px;
+  background: #1e1e1e;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
   padding:10px;
 }
 .messages { flex:1; overflow-y:auto; margin-bottom:5px; }
-.message {
-  background:#333; color:#fff; border-radius:8px;
-  padding:8px 12px; margin-bottom:10px; max-width:80%;
-  position:relative; word-wrap:break-word;
-}
+.message { background:#333; color:#fff; border-radius:8px; padding:8px 12px; margin-bottom:10px; max-width:90%; word-wrap:break-word; position:relative; }
 .message b { color:#fff; }
-.message small { display:block; font-size:0.7rem; color:#fff; margin-top:2px; }
+.message small { display:block; font-size:0.7rem; color:#fff; margin-top:2px;}
 .reactions { margin-top:4px; display:flex; gap:5px; font-size:1rem; cursor:pointer; }
 .emoji-picker { display:flex; flex-wrap:wrap; padding:5px; background:#2c2c2c; border-top:1px solid #444; max-height:100px; overflow-y:auto; }
 .emoji-picker span { font-size:1.5rem; margin:5px; cursor:pointer; transition:transform 0.1s; }
-.emoji-picker span:hover { transform:scale(1.3); }
+.emoji-picker span:hover { transform: scale(1.3); }
 .input-area { display:flex; border-top:1px solid #444; }
 .input-area input { flex:1; padding:10px; border:none; border-radius:0 0 0 10px; outline:none; background:#2c2c2c; color:#fff; }
 .input-area button { padding:10px 15px; border:none; background:#007bff; color:white; border-radius:0 0 10px 0; cursor:pointer; font-weight:bold; }
 .input-area button:hover { background:#0056b3; }
-.nickname-area, .username-area { display:flex; margin-bottom:5px; gap:5px; }
-.nickname-area input, .username-area input { flex:1; padding:5px; border-radius:5px; border:none; background:#2c2c2c; color:#fff; }
-.voice-chat-area { display:flex; gap:5px; margin-top:5px; }
-.voice-chat-area audio { display:none; }
+.nickname-area { display:flex; padding:5px; gap:5px; }
+.nickname-area input { flex:1; padding:5px; border-radius:5px; border:none; outline:none; background:#2c2c2c; color:#fff; }
+.nickname-area button { padding:5px 10px; border-radius:5px; border:none; background:#007bff; color:#fff; cursor:pointer; }
+.nickname-area button:hover { background:#0056b3; }
+.replying { font-size:0.7rem; color:#ccc; margin-bottom:2px; }
 </style>
 </head>
 <body>
 
 <div class="chat-container">
-  <div class="username-area">
+
+  <div class="nickname-area">
     <input id="usernameInput" placeholder="Set your username (one-time)" />
     <button id="setUsernameBtn">Set</button>
-  </div>
-  <div class="nickname-area">
-    <input id="nicknameInput" placeholder="Set nickname (change anytime)" />
+    <input id="nicknameInput" placeholder="Change nickname anytime" />
     <button id="setNicknameBtn">Set</button>
   </div>
 
   <div class="messages" id="messages"></div>
+  <div class="replying" id="replying"></div>
 
   <div class="emoji-picker" id="emojiPicker">
     <span>😀</span><span>😂</span><span>😍</span><span>😎</span>
@@ -65,153 +71,129 @@ body {
     <button id="sendBtn">Send</button>
   </div>
 
-  <div class="voice-chat-area">
-    <button id="startVoiceBtn">Start Voice Chat</button>
-    <input id="roomIdInput" placeholder="Room ID">
-    <button id="joinRoomBtn">Join Room</button>
-    <audio id="remoteAudio" autoplay></audio>
-  </div>
+  <button id="voiceBtn" style="margin:5px; padding:8px; border:none; border-radius:5px; background:#007bff; color:#fff; cursor:pointer;">Voice Chat</button>
+
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, orderBy, doc, updateDoc, arrayUnion, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, orderBy, doc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 
-const firebaseConfig = { /* your Firebase config */ };
+const firebaseConfig = {
+  apiKey: "AIzaSyAUSdIAjFmgHJyDs7DPm_wqDfH5gTtgowI",
+  authDomain: "anon-chat-7aeb8.firebaseapp.com",
+  projectId: "anon-chat-7aeb8",
+  storageBucket: "anon-chat-7aeb8.firebasestorage.app",
+  messagingSenderId: "893900185108",
+  appId: "1:893900185108:web:2c1d3e69adb019f5fa5101",
+  measurementId: "G-QWS96HKVH8"
+};
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const messagesDiv = document.getElementById("messages");
-const msgInput = document.getElementById("msgInput");
-const sendBtn = document.getElementById("sendBtn");
-const emojiPicker = document.getElementById("emojiPicker");
-
 let username = localStorage.getItem("username") || "";
 let nickname = localStorage.getItem("nickname") || "";
-document.getElementById("usernameInput").value = username;
-document.getElementById("nicknameInput").value = nickname;
+document.getElementById("usernameInput").value=username;
+document.getElementById("nicknameInput").value=nickname;
 
-const lastSentKey = "lastSentTime";
-const cooldown = 5000;
+let replyToId=null;
+const cooldown = 3000;
+const lastSentKey="lastSentTime";
 
-function sanitize(str){ return str.replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+const messagesDiv=document.getElementById("messages");
+const msgInput=document.getElementById("msgInput");
+const sendBtn=document.getElementById("sendBtn");
+const emojiPicker=document.getElementById("emojiPicker");
+const replyingDiv=document.getElementById("replying");
 
-const q = query(collection(db, "messages"), orderBy("timestamp","asc"));
-onSnapshot(q, (snapshot) => {
-  messagesDiv.innerHTML = "";
+const q=query(collection(db,"messages"),orderBy("timestamp","asc"));
+
+// Render messages
+onSnapshot(q,(snapshot)=>{
+  messagesDiv.innerHTML="";
   snapshot.forEach(docSnap=>{
     const msg = docSnap.data();
-    const div = document.createElement("div");
+    const div=document.createElement("div");
     div.classList.add("message");
 
-    const time = msg.timestamp?.toDate().toLocaleString() || "Just now";
-    const displayName = msg.nickname || msg.user;
-    div.innerHTML = `<b>${sanitize(displayName)}:</b> ${sanitize(msg.text)} <small>${time}</small>`;
+    const replyText=msg.replyToUser ? `<div class="replying">Replying to ${msg.replyToUser}</div>` : "";
+    const time=msg.timestamp?.toDate().toLocaleString() || "Just now";
+    const displayName=msg.nickname||msg.user;
+    div.innerHTML=`${replyText}<b>${displayName}:</b> ${msg.text} <small>${time}</small>`;
 
-    const reactionsDiv = document.createElement("div");
+    const reactionsDiv=document.createElement("div");
     reactionsDiv.classList.add("reactions");
-    const emojis = ["😀","😂","😍","😎","😢","😡","👍","❤️","🎉","💀","🔥"];
+    const emojis=["😀","😂","😍","😎","😢","😡","👍","❤️","🎉","💀","🔥"];
     emojis.forEach(e=>{
       const span=document.createElement("span");
-      span.textContent = e + (msg.reactions?.[e]?.length||"");
-      span.onclick = async ()=>{
-        const msgRef = doc(db,"messages",docSnap.id);
-        await updateDoc(msgRef,{[`reactions.${e}`]: arrayUnion(username)});
+      span.textContent=e+(msg.reactions?.[e]?.length||"");
+      span.onclick=async ()=>{
+        const msgRef=doc(db,"messages",docSnap.id);
+        await updateDoc(msgRef,{[`reactions.${e}`]:arrayUnion(username)});
       };
       reactionsDiv.appendChild(span);
     });
+
+    const replyBtn=document.createElement("button");
+    replyBtn.textContent="Reply";
+    replyBtn.style.marginLeft="5px";
+    replyBtn.style.background="#444";
+    replyBtn.style.color="#fff";
+    replyBtn.style.border="none";
+    replyBtn.style.borderRadius="5px";
+    replyBtn.style.cursor="pointer";
+    replyBtn.onclick=()=>{ replyToId=docSnap.id; replyingDiv.textContent="Replying to "+displayName; msgInput.focus(); }
+
+    div.appendChild(replyBtn);
     div.appendChild(reactionsDiv);
     messagesDiv.appendChild(div);
   });
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  messagesDiv.scrollTop=messagesDiv.scrollHeight;
 });
 
 // Send message
-sendBtn.onclick = async ()=>{
-  const now = Date.now();
-  const lastSent = parseInt(localStorage.getItem(lastSentKey))||0;
-  if(now-lastSent<cooldown){ alert("Wait before sending another message."); return; }
+sendBtn.onclick=async ()=>{
+  const now=Date.now();
+  const lastSent=parseInt(localStorage.getItem(lastSentKey))||0;
+  if(now-lastSent<cooldown){ alert("Wait a few seconds."); return; }
   if(!username){ alert("Set your username first."); return; }
   if(msgInput.value.trim()==="") return;
-  await addDoc(collection(db,"messages"),{
-    user: username,
-    nickname: nickname||username,
-    text: msgInput.value,
-    timestamp: serverTimestamp(),
-    reactions: {}
-  });
+  const data={ user:username, nickname:nickname||username, text:msgInput.value, timestamp:serverTimestamp(), reactions:{} };
+  if(replyToId) data.replyTo=replyToId;
+  if(replyToId) data.replyToUser=""; // optional
+  await addDoc(collection(db,"messages"),data);
   msgInput.value="";
-  localStorage.setItem(lastSentKey, now);
-};
+  localStorage.setItem(lastSentKey,now);
+  replyToId=null;
+  replyingDiv.textContent="";
+}
 msgInput.addEventListener("keypress",e=>{ if(e.key==="Enter") sendBtn.click(); });
 
+// Emoji picker
 emojiPicker.querySelectorAll("span").forEach(e=>{
   e.addEventListener("click",()=>{ msgInput.value+=e.textContent; msgInput.focus(); });
 });
 
 // Username/nickname
-document.getElementById("setUsernameBtn").onclick = ()=>{
-  if(username){ alert("Username is already set and cannot be changed."); return; }
-  const val = document.getElementById("usernameInput").value.trim();
-  if(!val){ alert("Enter a username."); return; }
-  username = val; localStorage.setItem("username",username);
+document.getElementById("setUsernameBtn").onclick=()=>{
+  const val=document.getElementById("usernameInput").value.trim();
+  if(!val){ alert("Enter username"); return; }
+  if(localStorage.getItem("username")){ alert("Username already set"); return; }
+  username=val;
+  localStorage.setItem("username",username);
   alert("Username set! Cannot change.");
 };
-document.getElementById("setNicknameBtn").onclick = ()=>{
-  const val = document.getElementById("nicknameInput").value.trim();
-  if(!val){ alert("Enter a nickname."); return; }
-  nickname = val; localStorage.setItem("nickname",nickname);
+document.getElementById("setNicknameBtn").onclick=()=>{
+  const val=document.getElementById("nicknameInput").value.trim();
+  if(!val) return;
+  nickname=val;
+  localStorage.setItem("nickname",nickname);
 };
 
-// --- Voice Chat ---
-let localStream, pc, roomRef;
-document.getElementById("startVoiceBtn").onclick = async ()=>{
-  localStream = await navigator.mediaDevices.getUserMedia({ audio:true });
-  pc = new RTCPeerConnection();
-  localStream.getTracks().forEach(track=> pc.addTrack(track, localStream));
-  const remoteAudio=document.getElementById("remoteAudio");
-  pc.ontrack = e=>{ remoteAudio.srcObject = e.streams[0]; remoteAudio.style.display="block"; };
-  pc.onicecandidate = async e=>{
-    if(e.candidate && roomRef){
-      const candidatesRef = collection(roomRef,'candidates');
-      await addDoc(candidatesRef,e.candidate.toJSON());
-    }
-  };
-  alert("Voice chat ready! Enter Room ID to join/create.");
-};
-
-document.getElementById("joinRoomBtn").onclick = async ()=>{
-  const roomId = document.getElementById("roomIdInput").value.trim();
-  if(!roomId){ alert("Enter Room ID"); return; }
-  roomRef = doc(db,"voiceRooms",roomId);
-  const roomSnap = await getDoc(roomRef);
-  if(!roomSnap.exists()){
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    await setDoc(roomRef,{offer:offer.toJSON()});
-    onSnapshot(roomRef,snap=>{
-      const data = snap.data();
-      if(!pc.currentRemoteDescription && data.answer){
-        pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-      }
-    });
-  } else {
-    const data = roomSnap.data();
-    await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    await updateDoc(roomRef,{answer:answer.toJSON()});
-  }
-  const candidatesRef = collection(roomRef,'candidates');
-  onSnapshot(candidatesRef,snap=>{
-    snap.docChanges().forEach(change=>{
-      if(change.type==='added'){
-        pc.addIceCandidate(change.doc.data());
-      }
-    });
-  });
+// Voice chat placeholder
+document.getElementById("voiceBtn").onclick=()=>{
+  alert("Voice chat requires a WebRTC signaling server. Placeholder only.");
 };
 </script>
-
 </body>
 </html>
